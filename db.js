@@ -4,7 +4,7 @@ console.warn("db called");
 const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
-    password: 'admin',
+    password: '',
     database: 'core360',
 });
 
