@@ -14,7 +14,7 @@ app.post('/addManager' , async (req , res)=>{
     const connection =await pool.getConnection()
     try{
        await connection.beginTransaction();
-        const response = await connection.execute('INSERT INTO user (userid, email,createdat , modifiedat , orgid, roleid , status) VALUES (?, ?, ?, ? , ? , ?, ?)',[userId, req.body.email, date , date , req.body.orgid,  '102' , 'inActive']);
+        const response = await connection.execute('INSERT INTO user (userid, email,createdat , modifiedat , orgid, roleid , status) VALUES (?, ?, ?, ? , ? , ?, ?)',[userId, req.body.email, date , date , req.body.orgId, req.body.roleId , 'inActive']);
         await connection.commit()
         res.status(200).send({data:"Manager Added"})
         const text = 'Please Click On the following link to Enter the detail and activate your account <br> ' +   `<a href="http://localhost:4200/auth/signup/activateAccount?id=${userId}" target="_blank">Activate Account</a>`;
@@ -35,6 +35,26 @@ app.post('/getUser' , async (req , res)=>{
     try{
         await connection.beginTransaction()
         const response=await connection.execute('select * from user where userid=?' , [req.body.id])
+        console.warn(response[0])
+        if(response[0].length>0){
+            res.status(200).send(response[0])
+        }else{
+            res.status(401).send({error:"Invalid Token"})
+        }
+        await connection.commit()
+       
+    }
+    catch(error){
+        await connection.rollback();
+        res.status(500).send("Detail fetched successfully")
+    }
+})
+
+app.get('/getorgPeople/:orgid' , async (req , res)=>{
+    const connection =await pool.getConnection();
+    try{
+        await connection.beginTransaction()
+        const response=await connection.execute('select * from user where orgid=?' , [req.params.orgid])
         console.warn(response[0])
         if(response[0].length>0){
             res.status(200).send(response[0])
