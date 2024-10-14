@@ -21,8 +21,8 @@ app.post('/signup', async (req, res) => {
         );
         
         const userResult = await connection.execute(
-            'INSERT INTO user VALUES (?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?)', 
-            [user_id, req.body.username, req.body.email, req.body.password, req.body.phone_no ,req.body.address, req.body.gender, req.body.dob, today, today, req.body.role, organization_id]
+            'INSERT INTO user VALUES (?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ? , ?)', 
+            [user_id, req.body.username, req.body.email, req.body.password, req.body.phone_no ,req.body.address, req.body.gender, req.body.dob, today, today, req.body.role, organization_id , 'Active']
         );
 
         await connection.commit();
