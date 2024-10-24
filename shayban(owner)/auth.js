@@ -32,7 +32,12 @@ app.post('/signup', async (req, res) => {
     } catch (error) {
         await connection.rollback();
         console.error('Transaction failed:', error);
-        res.status(500).send({ error: 'Transaction failed' });
+        if(String(error).includes('Duplicate entry')){
+            res.status(201).send({error:"Duplicate Entry"})
+        }else{
+            res.status(500).send({ error: 'Signup Failed'  , errorMsg:error });
+        }
+        
     } finally {
         if (connection) connection.release();
     }
