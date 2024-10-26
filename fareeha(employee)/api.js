@@ -35,4 +35,50 @@ app.post('/login',async (req,res)=>{
    
 })
 
+app.post('/addTask',async (req,res)=>{
+    const connection=await pool.getConnection()
+    const date=new Date()
+    try{
+        const taskid=await generateUniqueTaskId()
+        await connection.beginTransaction()
+        const response=await connection.execute(`insert into task (taskid,taskname,assignedby, assignedat, deadline, taskstatus, hourstracked, starttime, endtime, userid) VALUES (?,?,?,?,?,?,?,?,?,?)`,[taskid, req.body.taskname,req.body.assignedby, date, req.body.deadline,req.body.taskstatus, req.body.hourstracked, req.body.starttime,req.body.endtime, req.body.userid ])
+        await connection.commit()
+        res.status(200).send({
+            data:"task added successfully"
+        })
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({
+            data:"task added failed"
+        })
+    }
+    finally{
+        if(connection){
+            connection.release()
+        }
+    }
 
+})
+
+function generateUniqueId() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 10; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+async function generateUniqueTaskId() {
+    let taskid = generateUniqueId();
+    let exists = true;
+    
+    while (exists) {
+        const [rows] = await pool.query('SELECT * FROM task WHERE taskid = ?', [taskid]);
+        if (rows.length === 0) {
+            exists = false;
+        } else {
+            taskid = generateUniqueId(); 
+        }
+    }
+    return taskid;
+}
