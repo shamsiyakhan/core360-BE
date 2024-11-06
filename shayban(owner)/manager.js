@@ -1,6 +1,9 @@
 const app = require('../express.js');
 const pool = require('../db.js');
 const sgMail = require('@sendgrid/mail');
+const jwt=require('jsonwebtoken')
+
+const secretkey='$12345core360'
 
 const key=require('dotenv').config(); // Load environment variables from .env
 const sendGridApiKey = process.env.SENDGRID_API_KEY;
@@ -51,8 +54,20 @@ app.post('/getUser' , async (req , res)=>{
 })
 
 app.get('/getorgPeople/:orgid' , async (req , res)=>{
-    const connection =await pool.getConnection();
-    try{
+
+    const token = req.headers['authorization']?.split(' ')[1];
+
+    if (!token) {
+        return res.status(403).send({ error: "Please Login" });
+    }
+
+    jwt.verify(token, secretkey, async (err, user) => {
+        if (err) {
+            return res.status(403).send({ error: "Please Login" });
+        }
+
+     const connection =await pool.getConnection();
+        try{
         await connection.beginTransaction()
         const response=await connection.execute('select * from user where orgid=?' , [req.params.orgid])
         console.warn(response[0])
@@ -68,6 +83,8 @@ app.get('/getorgPeople/:orgid' , async (req , res)=>{
         await connection.rollback();
         res.status(500).send("Detail fetched successfully")
     }
+});
+
 })
 
 
@@ -113,7 +130,7 @@ app.get('/getTeams/:id', async (req, res) => {
 
         if (teams.length === 0) {
             await connection.rollback();
-            return res.status(404).send({ message: 'No teams found for this orgid' });
+            return res.status(401).send({ message: 'No teams found for this orgid' });
         }
 
         // Extract unique team member IDs

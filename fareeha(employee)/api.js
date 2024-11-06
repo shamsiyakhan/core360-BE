@@ -14,11 +14,12 @@ app.post('/login', async (req, res) => {
     try {
         await connection.beginTransaction();
         const [result] = await connection.execute('select * from user where email=? and password=?', [req.body.email, req.body.password])
-        console.warn(result)
+        console.warn(result[0])
         if (result.length == 0) {
             res.send({ error: 'Invalid Credential' })
         } else {
-            res.send({ data: result[0] })
+            res.send({ data: await generateToken(result[0]) })
+            
         }
 
 
@@ -36,29 +37,56 @@ app.post('/login', async (req, res) => {
 })
 
 app.post('/addTask', async (req, res) => {
-    const connection = await pool.getConnection()
-    const date = new Date()
-    try {
-        const taskid = await generateUniqueTaskId()
-        await connection.beginTransaction()
-        const response = await connection.execute(`insert into task (taskid,taskname,assignedby, assignedat, deadline, taskstatus, hourstracked, starttime, endtime, userid) VALUES (?,?,?,?,?,?,?,?,?,?)`, [taskid, req.body.taskname, req.body.assignedby, date, req.body.deadline, req.body.taskstatus, req.body.hourstracked, req.body.starttime, req.body.endtime, req.body.userid])
-        await connection.commit()
-        res.status(200).send({
-            data: "task added successfully"
-        })
-    } catch (error) {
-        await connection.rollback()
-        res.status(401).send({
-            data: "task added failed"
-        })
-    }
-    finally {
-        if (connection) {
-            connection.release()
-        }
+    const token = req.headers['authorization']?.split(' ')[1];
+
+    if (!token) {
+        return res.status(403).send({ error: "Please Login" });
     }
 
-})
+    jwt.verify(token, secretkey, async (err, user) => {
+        if (err) {
+            return res.status(403).send({ error: "Please Login" });
+        }
+
+        console.warn("JWT verified");
+
+        const connection = await pool.getConnection();
+        const date = new Date();
+        try {
+            const taskid = await generateUniqueTaskId();
+            await connection.beginTransaction();
+            const response = await connection.execute(
+                `INSERT INTO task (taskid, taskname, assignedby, assignedat, deadline, taskstatus, hourstracked, starttime, endtime, userid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    taskid,
+                    req.body.taskname,
+                    req.body.assignedby,
+                    date,
+                    req.body.deadline,
+                    req.body.taskstatus,
+                    req.body.hourstracked,
+                    req.body.starttime,
+                    req.body.endtime,
+                    req.body.userid,
+                ]
+            );
+            await connection.commit();
+            res.status(200).send({
+                data: "Task added successfully"
+            });
+        } catch (error) {
+            await connection.rollback();
+            res.status(401).send({
+                data: "Task addition failed"
+            });
+        } finally {
+            if (connection) {
+                connection.release();
+            }
+        }
+    });
+});
+
 
 app.get('/getTask/:id', async (req, res) => {
     const connection = await pool.getConnection()
@@ -109,3 +137,4 @@ async function generateUniqueTaskId() {
     }
     return taskid;
 }
+
