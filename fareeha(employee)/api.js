@@ -2,7 +2,8 @@ console.warn('api func called')
 //import express section
 const pool = require('../db.js'); //relative path (.. means->current folder se bhar(now on shamsi folder),..again now core360be)
 const app = require('../express.js')
-
+const jwt=require('jsonwebtoken')
+const secretkey='12345@core360'
 app.get('/', (req, res) => {
     res.send({ data: 'api created' })
 })
@@ -37,18 +38,8 @@ app.post('/login', async (req, res) => {
 })
 
 app.post('/addTask', async (req, res) => {
-    const token = req.headers['authorization']?.split(' ')[1];
 
-    if (!token) {
-        return res.status(403).send({ error: "Please Login" });
-    }
 
-    jwt.verify(token, secretkey, async (err, user) => {
-        if (err) {
-            return res.status(403).send({ error: "Please Login" });
-        }
-
-        console.warn("JWT verified");
 
         const connection = await pool.getConnection();
         const date = new Date();
@@ -84,7 +75,7 @@ app.post('/addTask', async (req, res) => {
                 connection.release();
             }
         }
-    });
+   
 });
 
 
@@ -138,3 +129,9 @@ async function generateUniqueTaskId() {
     return taskid;
 }
 
+
+function generateToken(user){
+    const jwtToken=jwt.sign({username:user.username , userid:user.userid , orgid:user.orgid} , secretkey , {expiresIn:'1h'})
+    user={...user , jwt:jwtToken}
+    return user;
+}

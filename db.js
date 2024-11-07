@@ -4,9 +4,13 @@ console.warn("db called");
 const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
-    password: '',
+    password: '',        // Make sure to set your password correctly
     database: 'core360',
+    waitForConnections: true,  // Wait for an available connection before failing
+    connectionLimit: 10,       // Maximum number of connections to create at once
+    queueLimit: 0             // No limit on the connection request queue (optional)
 });
+
 
 async function checkConnection() {
     try {

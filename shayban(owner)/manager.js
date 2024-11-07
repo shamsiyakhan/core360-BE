@@ -55,16 +55,7 @@ app.post('/getUser' , async (req , res)=>{
 
 app.get('/getorgPeople/:orgid' , async (req , res)=>{
 
-    const token = req.headers['authorization']?.split(' ')[1];
 
-    if (!token) {
-        return res.status(403).send({ error: "Please Login" });
-    }
-
-    jwt.verify(token, secretkey, async (err, user) => {
-        if (err) {
-            return res.status(403).send({ error: "Please Login" });
-        }
 
      const connection =await pool.getConnection();
         try{
@@ -83,7 +74,7 @@ app.get('/getorgPeople/:orgid' , async (req , res)=>{
         await connection.rollback();
         res.status(500).send("Detail fetched successfully")
     }
-});
+
 
 })
 
@@ -278,7 +269,7 @@ app.post('/update-registration' , async(req , res)=>{
     const connection=await pool.getConnection()
     try{
         await connection.beginTransaction();
-        connection.execute('update user set username=? , password=? , address=? , dob=? , modifiedat=? , status=? where userid=?' , [req.body.username , req.body.password , req.body.address , req.body.dob , date , 'active' , req.body.userid])
+        connection.execute('update user set username=? , password=? , address=? , dob=? , modifiedat=? , status=? , phonenumber=? where userid=?' , [req.body.username , req.body.password , req.body.address , req.body.dob , date , 'active' , req.body.phone_no, req.body.userid])
         connection.commit()
         res.status(200).send({data:"Onboarding Successfull You Can login with your credentials"})
     }
