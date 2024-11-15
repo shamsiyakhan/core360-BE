@@ -1,7 +1,8 @@
 const app = require('../express.js');
 const pool = require('../db.js');
 const sgMail = require('@sendgrid/mail');
-
+const jwt=require('jsonwebtoken')
+const secretkey='12345@core360'
 const key = require('dotenv').config(); // Load environment variables from .env
 const sendGridApiKey = process.env.SENDGRID_API_KEY;
 sgMail.setApiKey(sendGridApiKey);
@@ -446,6 +447,301 @@ app.get('/getCampaigns/:orgid' , async (req , res)=>{
 })
 
 
+app.post('/admin-login', async (req, res) => {
+    console.warn('email'+req.body.email)
+    console.warn('password' , req.body.password)
+    const connection = await pool.getConnection();
+    console.warn(connection);
+    try {
+        await connection.beginTransaction();
+        const [result] = await connection.execute('select * from admin where email=? and password=?', [req.body.email, req.body.password])
+        console.warn(result[0])
+        if (result.length == 0) {
+            res.send({ error: 'Invalid Credential' })
+        } else {
+            res.send({ data: await generateToken(result[0]) })
+            
+        }
+
+
+        await connection.commit();
+
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Transaction failed:', error);
+        res.status(500).send({ error: 'Transaction failed' });
+    } finally {
+        if (connection) connection.release();
+    }
+
+})
+
+app.get('/getAdminDetails', async (req, res) => {
+    console.warn("get user details called")
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        const token = req.headers.authorization?.split(' ')[1];
+        console.warn(token)
+        if (!token) {
+            return res.status(401).json({ message: 'No token provided' });
+        }
+        console.warn("decoding")
+
+        // Verify the token and decode it
+        const decoded = jwt.verify(token, '12345@core360');
+        console.warn(decoded)
+        const userId = decoded.userid;
+
+        console.warn("trying to get data")
+        const response = await connection.execute('SELECT * FROM admin WHERE admin_id = ?', [userId]);
+        if (response.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Respond with user data
+        res.status(200).json({data:response[0]});
+        await connection.commit();
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to authenticate token', error });
+        await connection.rollback();
+    }finally{
+        if(connection) connection.release()
+    }
+})
+
+
+app.post("/update-admin" , async (req , res)=>{
+    const connection=await pool.getConnection()
+    try{
+        const token = req.headers.authorization?.split(' ')[1];
+        console.warn(token)
+        if (!token) {
+            return res.status(401).json({ message: 'No token provided' });
+        }
+        console.warn("decoding")
+
+        // Verify the token and decode it
+        const decoded = jwt.verify(token, '12345@core360');
+        console.warn(decoded)
+        const userId = decoded.userid;
+        const date=new Date()
+        await connection.beginTransaction()
+        const response=await connection.execute('update admin set username=? , password=? ,phonenumber=? ,address=? , gender=? , dob=? , modifiedat=? where admin_id=?' , [req.body.username, req.body.password , req.body.phonenumber , req.body.address , req.body.gender ,  req.body.dob ,date , userId])
+        res.status(200).send({data:"User Data Updated SuccessFully"})
+        await connection.commit()
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({error:error})
+    }finally{
+      if(connection)  await connection.release
+    }
+})
+
+
+
+app.post("/restrict-organization/:orgid" , async (req , res)=>{
+    const orgid=req.params.orgid
+    const connection=await pool.getConnection()
+    try{
+       
+        const date=new Date()
+        await connection.beginTransaction()
+        const response=await connection.execute('update user set status=? where orgid=? and status=?' , ['Deactivated',  orgid , 'active'])
+       const response1= await connection.execute('UPDATE organization SET status = ? WHERE orgid = ?', ['Deactivated', orgid]);
+        res.status(200).send({data:"Account restricted SuccessFully"})
+        await connection.commit()
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({error:error})
+    }finally{
+      if(connection)  await connection.release
+    }
+})
+
+
+
+app.post("/remove-restrict-organization/:orgid" , async (req , res)=>{
+    const orgid=req.params.orgid
+    const connection=await pool.getConnection()
+    try{
+       
+        const date=new Date()
+        await connection.beginTransaction()
+        const response=await connection.execute('update user set status=? where orgid=? and status=?' , ['active',  orgid , 'Deactivated'])
+       const response1= await connection.execute('UPDATE organization SET status = ? WHERE orgid = ?', ['active', orgid]);
+        res.status(200).send({data:"Account restricted removed"})
+        await connection.commit()
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({error:error})
+    }finally{
+      if(connection)  await connection.release
+    }
+})
+
+
+app.get("/get-all-organization" , async (req , res)=>{
+    const connection=await pool.getConnection()
+    try{
+       
+        await connection.beginTransaction()
+        const response=await connection.execute('select * from organization')
+        res.status(200).send({data:response[0]})
+        await connection.commit()
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({error:error})
+    }finally{
+      if(connection)  await connection.release
+    }
+})
+
+app.post("/reportIssue", async (req, res) => {
+    const reportid = await generateUniqueReportId();
+    const connection = await pool.getConnection();
+    try {
+        const date = new Date();
+        await connection.beginTransaction();
+
+        // Step 1: Insert the report into the database
+        await connection.execute(
+            'INSERT INTO reports (report_id, report_title, report_content, report_status, reported_by, reported_on, resolved_on) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [reportid, req.body.report_title, req.body.report_content, 'Open', req.body.reported_by, date, '']
+        );
+
+        // Step 2: Get the user info from the user table
+        const [userInfo] = await connection.execute(
+            'SELECT email, username FROM user WHERE userid = ?',
+            [req.body.reported_by]
+        );
+
+        if (userInfo.length === 0) {
+            throw new Error('User not found');
+        }
+
+        const userEmail = userInfo[0].email;
+        const userName = userInfo[0].username;
+
+        // Step 3: Send an email using SendGrid
+        const msg = {
+            to: userEmail,
+            from: 'sehrozkhan2704@gmail.com', 
+            subject: `Report Received: ${req.body.report_title}`,
+            text: `Hello ${userName},\n\nThank you for submitting your report titled "${req.body.report_title}". We have received your issue and will review it shortly. You will be notified once we have updates.\n\nBest regards,\nSupport Team`,
+            html: `<p>Hello ${userName},</p><p>Thank you for submitting your report titled "<strong>${req.body.report_title}</strong>". We have received your issue and will review it shortly. You will be notified once we have updates.</p><p>Best regards,<br>Support Team</p>`
+        };
+
+        await sgMail.send(msg);
+
+        res.status(200).send({ data: `Report sent successfully. Notification email has been sent to ${userEmail}.` });
+        await connection.commit();
+    } catch (error) {
+        console.warn(error);
+        await connection.rollback();
+        res.status(400).send({ error: error.message });
+    } finally {
+        if (connection) await connection.release();
+    }
+});
+
+
+app.get("/get-all-reports" , async (req , res)=>{
+    const connection=await pool.getConnection()
+    try{
+       
+        await connection.beginTransaction()
+        const response=await connection.execute('select * from reports')
+        res.status(200).send({data:response[0]})
+        await connection.commit()
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({error:error})
+    }finally{
+      if(connection)  await connection.release
+    }
+})
+
+
+app.get("/getReports/:id" , async (req , res)=>{
+    const reportId=req.params.id
+    const connection=await pool.getConnection()
+    try{
+       
+        await connection.beginTransaction()
+        const response=await connection.execute('select * from reports where report_id=?' , [reportId])
+        res.status(200).send({data:response[0]})
+        await connection.commit()
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({error:error})
+    }finally{
+      if(connection)  await connection.release
+    }
+})
+
+app.post("/updateReport/:reportId", async (req, res) => {
+    const reportId = req.params.reportId;
+    const userId = req.body.userid;  
+    const reportReply = req.body.reportReply; 
+
+    const connection = await pool.getConnection();
+    try {
+        const date = new Date();
+        await connection.beginTransaction();
+
+        const [reportData] = await connection.execute('SELECT report_title FROM reports WHERE report_id = ?', [reportId]);
+        const reportTitle = reportData[0]?.report_title;
+
+        if (!reportTitle) {
+            return res.status(404).send({ error: "Report not found" });
+        }
+
+        const [userData] = await connection.execute('SELECT email FROM user WHERE userid = ?', [userId]);
+        const userEmail = userData[0]?.email;
+
+        if (!userEmail) {
+            return res.status(404).send({ error: "User not found" });
+        }
+
+        const emailContent = `
+            <h3>Resolution of your Report: ${reportTitle}</h3>
+            <p><strong>Response:</strong></p>
+            <p>${reportReply}</p>
+        `;
+
+        const msg = {
+            to: userEmail,
+            from: 'sehrozkhan2704@gmail.com', 
+            subject: `Resolution of your report: ${reportTitle}`,
+            html: emailContent,
+        };
+
+        await sgMail.send(msg);
+
+        // 4. Update the report status to 'Resolved' (Optional)
+        await connection.execute('UPDATE reports SET report_status = ? WHERE report_id = ?', ['Resolved', reportId]);
+
+        // Commit the transaction
+        await connection.commit();
+
+        res.status(200).send({ data: "Report updated and email sent successfully" });
+
+    } catch (error) {
+        console.warn(error);
+        await connection.rollback();
+        res.status(400).send({ error: error.message });
+    } finally {
+        if (connection) await connection.release();
+    }
+});
+
+function generateToken(user){
+    const jwtToken=jwt.sign({username:user.username , userid:user.admin_id } , secretkey , {expiresIn:'1h'})
+    user={...user , jwt:jwtToken}
+    return user;
+}
 
 async function generateUniqueCampaignId() {
     let marketing_id = generateUniqueId();
@@ -462,6 +758,22 @@ async function generateUniqueCampaignId() {
     return marketing_id;
 }
 
+
+
+async function generateUniqueReportId() {
+    let reportid = generateUniqueId();
+    let exists = true;
+    
+    while (exists) {
+        const [rows] = await pool.query('SELECT * FROM reports WHERE report_id = ?', [reportid]);
+        if (rows.length === 0) {
+            exists = false;
+        } else {
+            reportid = generateUniqueId(); 
+        }
+    }
+    return reportid;
+}
 
 async function generateUniqueInventoryId() {
     let inventid = generateUniqueId();

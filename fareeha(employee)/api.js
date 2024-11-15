@@ -9,7 +9,8 @@ app.get('/', (req, res) => {
 })
 
 app.post('/login', async (req, res) => {
-    console.warn(req.body.email)
+    console.warn('email'+req.body.email)
+    console.warn('password' , req.body.password)
     const connection = await pool.getConnection();
     console.warn(connection);
     try {
@@ -17,10 +18,15 @@ app.post('/login', async (req, res) => {
         const [result] = await connection.execute('select * from user where email=? and password=?', [req.body.email, req.body.password])
         console.warn(result[0])
         if (result.length == 0) {
-            res.send({ error: 'Invalid Credential' })
+            res.status(401).send({ error: 'Invalid Credential' })
         } else {
-            res.send({ data: await generateToken(result[0]) })
-            
+            console.warn(result[0])
+            if(result[0].status=='active'){
+                res.status(200).send({ data: await generateToken(result[0]) })
+            }else if(result[0].status=="Deactivated"){
+                res.status(200).send({ error: "Account Deactivated Contact Support at sehrozkhan2704@gmail.com" })
+            }
+             
         }
 
 

@@ -2,7 +2,7 @@
 const jwt = require('jsonwebtoken');
 const secretkey='12345@core360'
 // List of routes that should bypass JWT verification
-const excludedRoutes = ['/trackClick','/login', '/forgot-password','/forgot', '/signup' , '/update-registration' , '/getUser' , '/verifyOtp' , '/updatePassword' ,'/trackClick'];
+const excludedRoutes = ['/trackClick','/login', '/forgot-password','/forgot', '/signup' , '/update-registration' , '/getUser' , '/verifyOtp' , '/updatePassword' ,'/trackClick' , '/admin-login'];
 
 const jwtMiddleware = (req, res, next) => {
 

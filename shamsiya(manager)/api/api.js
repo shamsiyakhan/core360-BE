@@ -2,7 +2,7 @@
 const pool = require('../../db.js'); //relative path (.. means->current folder se bhar(now on shamsi folder),..again now core360be)
 const app = require('../../express.js')
 const sgMail = require('@sendgrid/mail');
-
+const jwt = require('jsonwebtoken');
 const key = require('dotenv').config(); // Load environment variables from .env
 const sendGridApiKey = process.env.SENDGRID_API_KEY;
 sgMail.setApiKey(sendGridApiKey);
@@ -155,46 +155,46 @@ async function insertOtp(email, otp) {
 
 app.get('/inventory/:id', async (req, res) => {
     console.warn(req.params.id)
-    const organizationId=req.params.id
+    const organizationId = req.params.id
 
 
     const connection = await pool.getConnection();
-    try{
+    try {
         await connection.beginTransaction();
-        const response=await connection.execute("select * from inventory where orgid=?",[organizationId]);
+        const response = await connection.execute("select * from inventory where orgid=?", [organizationId]);
         await connection.commit();
-        res.status(200).send({data:response[0]})
+        res.status(200).send({ data: response[0] })
     }
-        catch{
-            await connection.rollback()
-            res.status(401).send({error:'Faild To Get Values'})
+    catch {
+        await connection.rollback()
+        res.status(401).send({ error: 'Faild To Get Values' })
 
     }
-    finally{
-        if(connection) await connection.release()
+    finally {
+        if (connection) await connection.release()
 
     }
-   
+
 
 })
 
-app.post('/addinventory',async (req,res)=>{
+app.post('/addinventory', async (req, res) => {
 
-    const connection=await pool.getConnection();
-    const orgid=generateUniqueInventoryId()
-    try{
+    const connection = await pool.getConnection();
+    const orgid = generateUniqueInventoryId()
+    try {
         await connection.beginTransaction();
-        const response=await connection.execute('insert into inventory(inventid,inventcategory,inventname,price,details,stock,orgid)values(?,?,?,?,?,?,?)',[orgid,req.body.category,name,price,details,stock,orgid])
+        const response = await connection.execute('insert into inventory(inventid,inventcategory,inventname,price,details,stock,orgid)values(?,?,?,?,?,?,?)', [orgid, req.body.category, name, price, details, stock, orgid])
         await connection.commit();
-        res.status(200).send({data:response[0]})
+        res.status(200).send({ data: response[0] })
     }
-    catch{
+    catch {
 
         await connection.rollback();
-        res.status(401).send({error:'Faild data'})
+        res.status(401).send({ error: 'Faild data' })
     }
-    finally{
-        if(connection) await connection.release()
+    finally {
+        if (connection) await connection.release()
     }
 
 })
@@ -203,28 +203,122 @@ app.post('/addinventory',async (req,res)=>{
 async function generateUniqueUserId() {
     let user_id = generateUniqueId();
     let exists = true;
-    
+
     while (exists) {
         const [rows] = await pool.query('SELECT * FROM user WHERE userid = ?', [user_id]);
         if (rows.length === 0) {
             exists = false;
         } else {
-            user_id = generateUniqueId(); 
+            user_id = generateUniqueId();
         }
     }
     return user_id;
 }
 
+app.get('/getUserDetails', async (req, res) => {
+    console.warn("get user details called")
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        const token = req.headers.authorization?.split(' ')[1];
+        console.warn(token)
+        if (!token) {
+            return res.status(401).json({ message: 'No token provided' });
+        }
+        console.warn("decoding")
+
+        // Verify the token and decode it
+        const decoded = jwt.verify(token, '12345@core360');
+        console.warn(decoded)
+        const userId = decoded.userid;
+
+        console.warn("trying to get data")
+        const response = await connection.execute('SELECT * FROM user WHERE userid = ?', [userId]);
+        if (response.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Respond with user data
+        res.status(200).json({data:response[0]});
+        await connection.commit();
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to authenticate token', error });
+        await connection.rollback();
+    }finally{
+        if(connection) connection.release()
+    }
+})
+
+app.post("/update-user" , async (req , res)=>{
+    const connection=await pool.getConnection()
+    try{
+        const token = req.headers.authorization?.split(' ')[1];
+        console.warn(token)
+        if (!token) {
+            return res.status(401).json({ message: 'No token provided' });
+        }
+        console.warn("decoding")
+
+        // Verify the token and decode it
+        const decoded = jwt.verify(token, '12345@core360');
+        console.warn(decoded)
+        const userId = decoded.userid;
+        const date=new Date()
+        await connection.beginTransaction()
+        const response=await connection.execute('update user set username=? , password=? ,phonenumber=? ,address=? , gender=? , dob=? , modifiedat=? where userid=?' , [req.body.username, req.body.password , req.body.phonenumber , req.body.address , req.body.gender ,  req.body.dob ,date , userId])
+        res.status(200).send({data:"User Data Updated SuccessFully"})
+        await connection.commit()
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({error:error})
+    }finally{
+      if(connection)  await connection.release
+    }
+})
+
+app.post("/update-user-owner" , async (req , res)=>{
+    const connection=await pool.getConnection()
+    try{
+        const date=new Date()
+        await connection.beginTransaction()
+        const response=await connection.execute('update user set username=? , password=? ,phonenumber=? ,address=? , gender=? , dob=? , modifiedat=? where userid=?' , [req.body.username, req.body.password , req.body.phonenumber , req.body.address , req.body.gender ,  req.body.dob ,date , req.body.userid])
+        res.status(200).send({data:"User Data Updated SuccessFully"})
+        await connection.commit()
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({error:error})
+    }finally{
+      if(connection)  await connection.release
+    }
+})
+
+app.delete('/user/:userid' , async (req , res)=>{
+    const userid=req.params.userid
+    const connection=await pool.getConnection()
+    try{
+        const date=new Date()
+        await connection.beginTransaction()
+        const response=await connection.execute('delete from user where userid=?' , [userid])
+        res.status(200).send({data:"User Deleted SuccessFully"})
+        await connection.commit()
+    }catch(error){
+        await connection.rollback()
+        res.status(401).send({error:error})
+    }finally{
+      if(connection)  await connection.release
+    }
+})
+
 async function generateUniqueInventoryId() {
     let team_id = generateUniqueId();
     let exists = true;
-    
+
     while (exists) {
         const [rows] = await pool.query('SELECT * FROM inventory WHERE inventid = ?', [team_id]);
         if (rows.length === 0) {
             exists = false;
         } else {
-            team_id = generateUniqueId(); 
+            team_id = generateUniqueId();
         }
     }
     return team_id;
