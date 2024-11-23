@@ -178,27 +178,6 @@ app.get('/inventory/:id', async (req, res) => {
 
 })
 
-app.post('/addinventory', async (req, res) => {
-
-    const connection = await pool.getConnection();
-    const orgid = generateUniqueInventoryId()
-    try {
-        await connection.beginTransaction();
-        const response = await connection.execute('insert into inventory(inventid,inventcategory,inventname,price,details,stock,orgid)values(?,?,?,?,?,?,?)', [orgid, req.body.category, name, price, details, stock, orgid])
-        await connection.commit();
-        res.status(200).send({ data: response[0] })
-    }
-    catch {
-
-        await connection.rollback();
-        res.status(401).send({ error: 'Faild data' })
-    }
-    finally {
-        if (connection) await connection.release()
-    }
-
-})
-
 
 async function generateUniqueUserId() {
     let user_id = generateUniqueId();
@@ -332,3 +311,23 @@ function generateUniqueId() {
     }
     return result;
 }
+
+app.get('/gettasks/:id' , async (req,res)=>{
+    const assignby=req.params.id
+    const connection=await pool.getConnection()
+    try{
+         await connection.beginTransaction()
+         const response=connection.execute('select * from task where assignedby=?',[assignby])
+         res.status(200).send({data:response[0]})
+         await connection.commit()
+    }
+    catch(errorobj){
+        await connection.rollback()
+        res.status(401).send({error:errorobj})
+    }
+    finally{
+        if(connection){
+             await connection.release()
+        }
+    }
+})

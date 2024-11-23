@@ -273,6 +273,32 @@ app.post("/addInventory/:orgId" , async (req , res)=>{
     }
 })
 
+
+
+app.post("/addBulkInventory/:orgId" , async (req , res)=>{
+
+    const orgId=req.params.orgId
+    const connection=await pool.getConnection()
+    console.warn(orgId)
+    try{
+        await connection.beginTransaction()
+
+        const data=req.body.data
+        data.forEach(async element => {
+            const inventId= await generateUniqueInventoryId()
+            const response=await connection.execute('insert into inventory (inventid , inventcategory , inventname , price , details , stock , orgid ) values(?,?,?,?,?,?,?)' , [inventId, element.inventcategory, element.inventname ,element.price , element.details , element.stock ,  orgId])
+        });
+        res.status(200).send({data:`Inventory Added Successfully`})
+        await connection.commit()
+    }catch(error){
+        console.warn(error)
+        await connection.rollback()
+        res.status(400).send({error:error})
+    }finally{
+        if(connection) await connection.release()
+    }
+})
+
 app.get("/getInventory/:orgid" , async (req ,res)=>{
     const orgid=req.params.orgid
     const connection=await pool.getConnection()
