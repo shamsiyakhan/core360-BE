@@ -763,6 +763,41 @@ app.post("/updateReport/:reportId", async (req, res) => {
     }
 });
 
+app.get('/checkSession', async (req, res) => {
+    const token = req.headers['authorization']?.split(' ')[1]; 
+
+    if (!token) {
+        return res.status(401).json({ logOut: 'No token provided, please log out.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, secretkey);
+        const userId = decoded.userid;
+
+        const connection = await pool.getConnection();
+
+        try {
+            const [user] = await connection.execute('SELECT * FROM user WHERE userid = ?', [userId]);
+
+            if (user.length === 0) {
+                return res.status(401).json({ logOut: 'Invalid session, user not found. Please log out.' });
+            }
+
+            return res.status(200).json({ logIn: 'Logged in', user: user[0] });
+
+        } catch (dbError) {
+            console.error('Database error:', dbError);
+            return res.status(500).json({ logOut: 'Database query failed', error: dbError.message });
+        } finally {
+            if (connection) await connection.release(); 
+        }
+
+    } catch (tokenError) {
+        return res.status(401).json({ logOut: 'Invalid token, please log out.', error: tokenError.message });
+    }
+});
+  
+
 function generateToken(user){
     const jwtToken=jwt.sign({username:user.username , userid:user.admin_id } , secretkey , {expiresIn:'1h'})
     user={...user , jwt:jwtToken}

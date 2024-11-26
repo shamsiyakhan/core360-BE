@@ -90,6 +90,7 @@ app.get('/getTask/:id', async (req, res) => {
     const id = req.params.id;
     const connection = await pool.getConnection();
     try {
+        console.log("before ")
         await connection.beginTransaction();
 
         // Execute the query to get the task and user details
@@ -114,7 +115,7 @@ app.get('/getTask/:id', async (req, res) => {
                 t.userid = ?;`,
             [id]
         );
-
+        console.log("after ")
         console.warn('Raw Response:', response);  // Debugging: Check raw response
 
         // Restructure the response
