@@ -303,6 +303,22 @@ async function generateUniqueInventoryId() {
     return team_id;
 }
 
+
+async function generateUniqueRequestId() {
+    let rid = generateUniqueId();
+    let exists = true;
+
+    while (exists) {
+        const [rows] = await pool.query('SELECT * FROM taskrequest WHERE rid = ?', [rid]);
+        if (rows.length === 0) {
+            exists = false;
+        } else {
+            rid = generateUniqueId();
+        }
+    }
+    return team_id;
+}
+
 function generateUniqueId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -331,3 +347,117 @@ app.get('/gettasks/:id' , async (req,res)=>{
         }
     }
 })
+/* employee task assign */
+
+
+app.post('/raiserequest/:id', async (req, res) => {
+    const taskid = req.params.id;
+    const { msg, deadline } = req.body; 
+    const reqid= await generateUniqueRequestId
+    const connection = await pool.getConnection();
+  
+    try {
+      // Start the transaction
+      await connection.beginTransaction();
+  
+      // Fetch task details
+      const [taskRows] = await connection.execute("SELECT * FROM task WHERE taskid = ?", [taskid]);
+      if (taskRows.length === 0) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+  
+      // Extract the required fields from the task
+      const task = taskRows[0];
+      const assignedby = task.assignedby;
+      const assignedto = task.userid;
+  
+      // Insert into the taskrequest table
+      const query = `
+        INSERT INTO taskrequest (rid ,assignedby, assignedto, rmsg, deadline, status, taskid)
+        VALUES (?,?, ?, ?, ?, 'pending', ?)
+      `;
+      await connection.execute(query, [reqid , assignedby, assignedto, msg, deadline, taskid]);
+  
+      // Commit the transaction
+      await connection.commit();
+  
+      res.status(201).json({ message: "Request raised successfully" });
+    } catch (error) {
+      // Rollback the transaction in case of an error
+      await connection.rollback();
+      res.status(500).json({ error: "An error occurred", details: error.message });
+    } finally {
+      // Release the connection
+      connection.release();
+    }
+  });
+
+
+
+  app.get('/getMyRequest/:id' , async (req,res)=>{
+    const userid=req.params.id
+    const connection=await pool.getConnection()
+    try{
+         await connection.beginTransaction()
+         const response=connection.execute('select * from taskrequest where assignedby=? and status=?',[assignby , 'pending'])
+         res.status(200).send({data:response[0]})
+         await connection.commit()
+    }
+    catch(errorobj){
+        await connection.rollback()
+        res.status(401).send({error:errorobj})
+    }
+    finally{
+        if(connection){
+             await connection.release()
+        }
+    }
+})
+
+
+
+
+
+app.post('/approveRequest/:id' , async (req,res)=>{
+    const rid=req.params.id
+    const connection=await pool.getConnection()
+    try{
+         await connection.beginTransaction()
+         const response=connection.execute('update taskrequest set status=? and deadline=? where rid=?' , ['approved' , req.body.deadline , rid])
+         const response1=connection.execute('update task set deadline=? where taskid=?' , ['approved' ,rid])
+         res.status(200).send({data:response[0]})
+         await connection.commit()
+    }
+    catch(errorobj){
+        await connection.rollback()
+        res.status(401).send({error:errorobj})
+    }
+    finally{
+        if(connection){
+             await connection.release()
+        }
+    }
+})
+
+
+
+app.post('/declineRequest/:id' , async (req,res)=>{
+    const rid=req.params.id
+    const connection=await pool.getConnection()
+    try{
+         await connection.beginTransaction()
+         const response=connection.execute('update taskrequest set status=?  where rid=?' , ['declined', rid])
+         res.status(200).send({data:response[0]})
+         await connection.commit()
+    }
+    catch(errorobj){
+        await connection.rollback()
+        res.status(401).send({error:errorobj})
+    }
+    finally{
+        if(connection){
+             await connection.release()
+        }
+    }
+})
+  

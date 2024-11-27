@@ -2,15 +2,15 @@ console.warn('api func called')
 //import express section
 const pool = require('../db.js'); //relative path (.. means->current folder se bhar(now on shamsi folder),..again now core360be)
 const app = require('../express.js')
-const jwt=require('jsonwebtoken')
-const secretkey='12345@core360'
+const jwt = require('jsonwebtoken')
+const secretkey = '12345@core360'
 app.get('/', (req, res) => {
     res.send({ data: 'api created' })
 })
 
 app.post('/login', async (req, res) => {
-    console.warn('email'+req.body.email)
-    console.warn('password' , req.body.password)
+    console.warn('email' + req.body.email)
+    console.warn('password', req.body.password)
     const connection = await pool.getConnection();
     console.warn(connection);
     try {
@@ -21,12 +21,12 @@ app.post('/login', async (req, res) => {
             res.status(401).send({ error: 'Invalid Credential' })
         } else {
             console.warn(result[0])
-            if(result[0].status=='active'){
+            if (result[0].status == 'active') {
                 res.status(200).send({ data: await generateToken(result[0]) })
-            }else if(result[0].status=="Deactivated"){
+            } else if (result[0].status == "Deactivated") {
                 res.status(200).send({ error: "Account Deactivated Contact Support at sehrozkhan2704@gmail.com" })
             }
-             
+
         }
 
 
@@ -47,46 +47,46 @@ app.post('/addTask', async (req, res) => {
 
 
 
-        const connection = await pool.getConnection();
-        const date = new Date();
-        try {
-            const taskid = await generateUniqueTaskId();
-            await connection.beginTransaction();
-            const response = await connection.execute(
-                `INSERT INTO task (taskid, taskname, assignedby, assignedat, deadline, taskstatus, hourstracked, starttime, endtime, userid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    taskid,
-                    req.body.taskname,
-                    req.body.assignedby,
-                    date,
-                    req.body.deadline,
-                    req.body.taskstatus,
-                    req.body.hourstracked,
-                    req.body.starttime,
-                    req.body.endtime,
-                    req.body.userid,
-                ]
-            );
-            await connection.commit();
-            res.status(200).send({
-                data: "Task added successfully"
-            });
-        } catch (error) {
-            await connection.rollback();
-            res.status(401).send({
-                data: "Task addition failed"
-            });
-        } finally {
-            if (connection) {
-                connection.release();
-            }
+    const connection = await pool.getConnection();
+    const date = new Date();
+    try {
+        const taskid = await generateUniqueTaskId();
+        await connection.beginTransaction();
+        const response = await connection.execute(
+            `INSERT INTO task (taskid, taskname, assignedby, assignedat, deadline, taskstatus, hourstracked, starttime, endtime, userid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                taskid,
+                req.body.taskname,
+                req.body.assignedby,
+                date,
+                req.body.deadline,
+                req.body.taskstatus,
+                req.body.hourstracked,
+                req.body.starttime,
+                req.body.endtime,
+                req.body.userid,
+            ]
+        );
+        await connection.commit();
+        res.status(200).send({
+            data: "Task added successfully"
+        });
+    } catch (error) {
+        await connection.rollback();
+        res.status(401).send({
+            data: "Task addition failed"
+        });
+    } finally {
+        if (connection) {
+            connection.release();
         }
-   
+    }
+
 });
 
 
 app.get('/getTask/:id', async (req, res) => {
-   
+
     const id = req.params.id;
     const connection = await pool.getConnection();
     try {
@@ -123,12 +123,12 @@ app.get('/getTask/:id', async (req, res) => {
             taskId: row.taskid,
             taskName: row.taskname,
             taskStatus: row.taskstatus,
-            deadline:row.deadline,
+            deadline: row.deadline,
             assignedat: row.assignedat,
             hourstracked: row.hourstracked,
             starttime: row.starttime,
             endtime: row.endtime,
-            progressStatus:row.inprogress,
+            progressStatus: row.inprogress,
             // Mapping assignedBy user (user who assigned the task)
             assignedBy: {
                 userId: row.assignedby_id || null,
@@ -164,16 +164,16 @@ app.get('/getTask/:id', async (req, res) => {
 
 })
 
-app.post("/start-task/:taskid" , async (req , res)=>{
-    const taskId=req.params.taskid
+app.post("/start-task/:taskid", async (req, res) => {
+    const taskId = req.params.taskid
     const currentDateTime = new Date().toISOString().slice(0, 19).replace('T', ' ');  // Get current date & time in 'YYYY-MM-DD HH:mm:ss' format
     const connection = await pool.getConnection();
     console.warn(connection);
     try {
         await connection.beginTransaction();
-        const [result] = await connection.execute('update task set starttime=? , endtime=? , inprogress=? , taskstatus=?  where taskid=?', [currentDateTime, "" , true , "In Progress" ,taskId])
+        const [result] = await connection.execute('update task set starttime=? , endtime=? , inprogress=? , taskstatus=?  where taskid=?', [currentDateTime, "", true, "In Progress", taskId])
         console.warn(result[0])
-       res.status(200).send({data:"Task Started"})
+        res.status(200).send({ data: "Task Started" })
 
 
         await connection.commit();
@@ -238,10 +238,10 @@ app.post("/end-task/:taskid", async (req, res) => {
     }
 });
 
-app.post('/completeTask/:taskid' , async (req , res)=>{
-    const taskId=req.params.taskid;
+app.post('/completeTask/:taskid', async (req, res) => {
+    const taskId = req.params.taskid;
     const currentDateTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const connection=await pool.getConnection()
+    const connection = await pool.getConnection()
     try {
         await connection.beginTransaction();
 
@@ -270,7 +270,7 @@ app.post('/completeTask/:taskid' , async (req , res)=>{
 
         const [result] = await connection.execute(
             'UPDATE task SET endtime = ?, hourstracked = ?, inprogress = ? , taskstatus=? WHERE taskid = ?',
-            [currentDateTime, newHourstracked.toFixed(2), false, "Completed" , taskId]  // Store value rounded to 2 decimal places
+            [currentDateTime, newHourstracked.toFixed(2), false, "Completed", taskId]  // Store value rounded to 2 decimal places
         );
 
         // Step 4: Commit the transaction
@@ -314,8 +314,8 @@ async function generateUniqueTaskId() {
 }
 
 
-function generateToken(user){
-    const jwtToken=jwt.sign({username:user.username , userid:user.userid , orgid:user.orgid} , secretkey , {expiresIn:'1h'})
-    user={...user , jwt:jwtToken}
+function generateToken(user) {
+    const jwtToken = jwt.sign({ username: user.username, userid: user.userid, orgid: user.orgid }, secretkey, { expiresIn: '1h' })
+    user = { ...user, jwt: jwtToken }
     return user;
 }
