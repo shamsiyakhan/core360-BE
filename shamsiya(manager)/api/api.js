@@ -567,7 +567,7 @@ app.get('/requestStatus/:id', async (req, res) => {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
-
+ 
         // Query to get details from taskrequest and task tables
         const [response] = await connection.execute(
             `SELECT 
